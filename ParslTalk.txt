@@ -1,0 +1,191 @@
+* Intro *
+Hi, my name is Joel Griffith, and tonight I'll be presenting an overview of a Python package that I work with a little bit, and in fact I help out the group that's developing it with some applications.
+
+The package is called Parsl, that's short for "Parallel Scripting Library"; this is a Python library that provides tools for parallelizing code.  That is, to construct workflows based on data and data transformations that execute efficiently in parallel.  This allows code to execute much more quickly and much more cost-effectively when you're using paid computing resources like cloud servers or computing clusters.
+
+It tonight's talk, I'll give a short history of the project, a description of its features, and a few examples of how it's used in practice.
+
+
+* What parallelization is good for *
+First, it's probably a good idea to take a minute to talk about what parallel computing is and what it's good for.
+
+Typically a simple program, like you would write and run yourself, executes as a single thread at the CPU level.  
+
+Modern CPU cores are capable of handling multiple threads of execution by switching back-and-forth rapidly between threads using CPU time that would ordinarily be idle.
+In modern multi-core CPUs, which almost all CPUs are these days, every core can execute threads at the same time.
+When using even more advanced facilities, like cloud services or cluster computing, or even if you just have a rack of video cards in your basement to do some BitCoin mining, then you'll have multiple multi-core CPUs at your disposal.
+
+To make the best use of all of these threads and cores, a program can specify that parts of it can be split off and run separately on separate threads or cores.
+|browsers| For example, modern browsers run different tabs in different threads and different processes so that if one tab crashes, it doesn't take down all the rest.
+This kind of multi-threaded or parallel execution tends to reduce the total execution time of your program.
+That's nice on its own, but if you're paying for CPU time, like with cloud and cluster providers, then that's also saving you money.  Or, to look at it another way, for a fixed amount of money, using all of the threads and cores available to you allows you to do even more computation to get better results.
+
+What Parsl does is let you write Python code in a way that's easy to distribute among nearly any amount of parallel resources, from a few threads on your single-CPU laptop all the way up to a supercomputing research cluster, and then it handles that distribution for you during execution.
+
+
+* History *
+Before I get to Parsl itself and how it's used, I'll give you a little bit of the history of its development because it's kind of neat, especially if you're interested in how open-source projects get started and how they become sustainable.
+
+About 2007, a few people at the University of Chicago and the nearby Argonne National Laboratory created a scripting language they called Swift.
+|Apple Swift| Now, you may be familiar with the Swift languange developed by Apple for iOS programming, this is a different Swift, and in fact it predates Apple's Swift, the names are just a coincidence.
+
+Here's a sample of what Swift looks like.  Don't spend too much effort trying to read it.
+I'll just point out a couple of things;
+here we're defining functions with File inputs and outputs and apps to manipulate data files; we'll see a similar structure later in Parsl.
+Here, we're declaring and defining a bunch of variables, Files, strings, an so on.  Swift's defining feature is that it's "implicitly parallel", meaning that it executes all code in parallel on its own, without the programmer needing to say "make this parallel".
+That's true even for these variable declarations -- if the Swift interpreter can find a way to instantiate these two strings in parallel, it'll do that automatically.
+
+The target audience for Swift was the scientific programming community, and they found that that community was *very* interested in having such a thing to execute their code more efficiently, because for the same amount of grant money paid to a computing resource, they could push their code further and get better results from their research.
+They also found that the community was *very* not at all interested in learning a new language to do that.
+What ended up happening was that research groups would bring them their code and say, "Will you convert this into Swift for us?  We'll pay you a consultancy fee out of our grant".  That wasn't the original idea, but, you know, never look a business model in the mouth.  So, several of the main developers of Swift founded a startup called ParallelWorks in Chicago whose bread-and-butter business is converting code for academic and industry researchers into Swift.
+
+Nevertheless, the idea of a general-purpose language that anyone could use to parallelize their own workflow stuck around, and about three years ago a group of people at the University of Chicago, several of whom were involved with developing Swift, got a funding grant from the National Science Foundation to make that happen.
+
+The way they figured it, if the problem with Swift had been that no one in their target audience wanted to learn a new language, then they would need to work within an existing language, preferably one that was already popular for scientific programming.
+And these days Python is really the only choice for that.
+Within the past 5-10 years, packages like 'pandas' and 'numpy' and 'matplotlib' have made Python the go-to programming language for new code in scientific research, and the more recent introduction of Jupyter Notebooks has really cemented that.
+So the approach they decided to take was to create a new scripting structure within Python that's easy to learn, portable among execution platforms, and can serve as a general-purpose parallelization language.
+
+
+* How I'm involved *
+Real quick, I'll also explain my connection to this.  I work for a science education nonprofit program called QuarkNet, one of the things we do is maintain a set of webapps that we call e-Labs that teachers can use in the classroom that take real scientific data and guide students through data analysis exercises using it.  
+
+These e-Labs were originally developed in large part by some of the same people who created Swift, and in fact the source code for them contains an early version of Swift to speed up the data analysis exercises.  So when the Parsl project got funded a few years back, they contacted QuarkNet to continue that relationship, with the result that I became engaged to help the Parsl group explore educational applications for the package.
+
+
+* Parsl's parallelization tools *
+| Switch to browser |
+SO!  Here is Parsl.  This is an example taken from their tutorial that shows the main features pretty well.
+
+-Config-
+Here's the configuration.  One of the things Parsl focuses on is portability, and part of that is abstracting the execution configuration into a single Config object.
+So, if you want to move your code between your local computer or a research cluster, or Amazon Web Services, all you have to do is define a Config object for each one, and then load whichever one you want when you move to a different environment, everything else is the same.
+
+This one is nothing fancy, we're just set up to use the threads on my laptop's CPU, completely local.  This is pretty much the simplest possible configuration you can have for Parsl.
+
+I left this in so you could see a good example of how quickly they're moving in making the library as easy to use as possible.
+Up until December, this is how you used to have to do the configuration, by explicitly importing and instantiating the Config object, but now they have standard configurations, like local threads, essentially prepackaged *here*.
+
+
+-Apps-
+Here we're defining some Python functions, and this is where we really start to see how Parsl works.  Parsl provides a set of decorators to turn Python functions into what it calls "Apps".
+
+Now, I was not familiar with decorators when I first started using Parsl, so just in case anyone is in the same boat as me:
+A decorator is a function or a class that you can apply to another function using the "@" notation shown here, directly above the function definition, and whenever that function is used in your code, the decorator will alter its execution in some predefined way.
+
+In this case, the App decorators allow Parsl to take every time these functions are used in your code and arrange them into an graph of the exact sequence everything has to happen in, and that allows it to decide how it can most efficiently distribute that graph among all of the threads that you have at your disposal to execute them in parallel.
+| show slideshow diagram |
+
+| back to browser |
+You'll notice there's two types of Apps shown here, these are the only two there are.
+A 'Python App' is pretty simple, it's a function containing ordinary Python code that can return anything you like.
+But what if your code already exists and it isn't written in Python?  That's *pretty* common in both scientific programming and business and industrial programming.  There are major scientific experiments today that rely on FORTRAN code, C, C++, Perl, you name it.
+I have relatives who work for the Social Security Administration who tell me they still use FORTRAN - extensively - because that's what there was when these programs were written, and they still work, so why fiddle with them?
+
+Not a problem!  As long as there exists a UNIX terminal command that will execute your script, Parsl can use the 'Bash App' to define a Python function that returns that command as a string, which can then be executed on the same footing as any other pure Python function, including for parallelization.
+
+In fact, I discovered a nice side benefit of Parsl's Bash App while I was putting this talk together.
+I wanted to remove the Parsl syntax from this example to show you the same program the way you would write it without Parsl, but it turns out that it can sometimes be a pain in the butt to call Bash directly from inside a Jupyter Notebook like this.
+There are some facilities for it, but they tend to break down when you start trying to do things like variable arguments and special functions like RANDOM.
+So, even you don't want to parallelize a thing, Parsl makes executing straight Bash script from inside a Jupyter Notebook a breeze.
+
+
+-Inputs and Outputs-
+The last feature I want to bring your attention to is the use of "inputs" and "outputs" as arguments.  "inputs" and "outputs" are reserved words in Parsl, and you use them to specify what data is input to be changed by a function and what data is output after having been changed.  This is what allows Parsl's Dataflow Kernel to map out the chain or web of Apps as they pass data around and put them into the correct execution graph.
+
+
+-Execution-
+So let me walk you through what this toy program is doing.
+
+This function will run the Bash command to echo a random number into the file whose name we give it, and that file will be its "data output"
+
+This function will take any number of such files as "data inputs", use a Bash command to 'cat' them into a single file, which is then its "data output"
+
+And finally this function will take a file as "data input", open it, sum the numbers inside, and return that sum.
+
+Here's where we execute that code.  First, we create a list of 5 files to hold random numbers, and we fill them using the 'generate' App *here*.  Then, we concatenate them into one file using the 'concat' app, then we find the total and return it.
+
+Let's see how it works!
+
+There you have it.
+
+
+* Cosmic Ray Data *
+I've got one more example before we end, this one's more realistic than the tutorial application, but still pretty simple on the scale of things Parsl is designed to handle, so it's a good illustration of how to use Parsl for something semi-practical.
+
+| Switch to Binder tab |
+This is a workflow taken from the e-Labs I mentioned earlier.  This is from the Cosmic Ray e-Lab.
+| Switch to slideshow |
+As a little bit of background, the Earth is constantly bombarded by high-energy particles from outer space we call "cosmic rays".
+These rays slam into the upper atmosphere and produce a spray of secondary particles, including bunches of particles called muons that reach the surface around us.
+It isn't too hard to build a detector that detects these cosmic ray muons as they pass through, and in fact we do that.
+QuarkNet and Fermilab work together to build and distribute cosmic ray detectors to classrooms around the country, and when you use one, you can upload the data it collects to our e-Lab, and then anyone else, whether you have a detector or not, can do data analysis studies with that data.
+What I've done is taken the workflow of one of those studies and pulled it out into a Jupyter Notebook.
+
+| Switch to browser |
+This exercise is a Flux Study, which is a fairly simple exercise that takes the raw data and makes a plot of the flux of cosmic rays - the number of rays that hit the detector per unit area per minute for whatever time period is covered by the original data.
+
+The workflow itself is a series of Perl scripts.
+In the first part of the notebook, I've used only standard Python and Jupyter's native ability to call Bash to call Perl to recreate the same workflow as in the e-Lab study. 
+In the second part, I've arranged the workflow into a series of Parsl Bash Apps to do the same thing, complete with decorators and "inputs" and "outputs" that are fed through each of the Apps in sequence.
+On each one, I've added a little code to take timestamps and calculate the execution time so we can compare the two.
+
+This particular study is taking about 25 MB total raw cosmic ray data and executing the workflow locally.
+
+I wanted to run this for you live as a demo, but I cannot get Binder to work for this Jupyter Notebook.  Binder is the online service that serves Jupyter Notebooks from GitHub repositories, which is where I have this notebook stored.
+
+So, we'll have to be content with just reading the output stored from the last time I successfully ran this, which was from my work laptop, that's local thread execution on a dual-core Intel i5 with 4 threads per core.
+
+What we see is that for this really simple workflow executed on a whopping 8 threads over 2 CPU cores, Parsl reduces the execution time from about 3.7 seconds to a little over 2 seconds, or about 45%.  I've run this demo several times with different input data, and it seems to hit between 30%-50% pretty consistently.
+
+Now, don't mistake this for any sort of scientific benchmarking process, but it does give you a quick flavor of what Parsl is capable of doing.
+
+
+* Conclusion *
+At this point I've told you about all I know about Parsl.  I use it in Jupyter Notebooks like this, but I'm not directly involved with its development, so I don't know a whole lot about the technical details behind it.
+
+If anybody wants to know more, here's all the online resources you could want.  If you do have any technical questions, I can tell you that the dev team is great, all nice and wonderful people who would love to answer your questions, and I'm glad to put you in touch with them if you want.
+
+| Questions |
+
+
+
+
+GitHub link:
+https://github.com/QuarkNet-HEP/cosmic-ray-notebooks/blob/master/Analysis/ParslComparison.ipynb
+
+Binder link:
+https://mybinder.org/v2/gh/QuarkNet-HEP/cosmic-ray-notebooks/master?filepath=Analysis%2FParslComparison.ipynb
+
+Colab link:
+https://colab.research.google.com/
+https://colab.research.google.com/github/QuarkNet-HEP/cosmic-ray-notebooks/blob/master/Analysis/ParslComparison.ipynb
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
